@@ -1,12 +1,10 @@
-import json
-
 import numpy as np
-import pandas as pd
 import pytest
-from click.testing import CliRunner
+import torch
+from torch.utils.data import DataLoader, TensorDataset
 
-from scripts.train_NYC_taxi import main, predict_from_checkpoint
-from torch_anchor_regression import regression_metrics
+from torch_anchor_regression import AnchorLoss, fit, predict, regression_metrics
+from torch_anchor_regression.data import StratifiedSampler
 
 
 def test_regression_metrics():
@@ -27,29 +25,26 @@ def test_regression_metrics():
     assert {key: scores[key] for key in expected} == pytest.approx(expected)
 
 
-def test_train_select_and_reload(tmp_path):
-    rng = np.random.default_rng(0)
-    data = {}
-    for split in ("train", "valid", "test"):
-        x = rng.normal(size=(30, 2))
-        data.update(
-            {
-                f"x_{split}": x,
-                f"y_{split}": 20 + x[:, 0],
-                f"group_{split}": np.repeat([3, 7, 9], [1, 9, 20]),
-            }
-        )
-    np.savez(tmp_path / "data.npz", **data)
-    arguments = f"--data-path {tmp_path / 'data.npz'} --output {tmp_path / 'run'} --width 8"
-    result = CliRunner().invoke(main, arguments.split())
-    assert result.exit_code == 0, result.output + str(result.exception)
+def test_fit_selects_and_loads_best_epoch():
+    torch.manual_seed(0)
+    groups = torch.as_tensor(np.repeat([3, 7, 9], [20, 30, 50]))
+    x = torch.randn(100, 2)
+    y = x[:, 0] + 0.5 * (groups == 3) + 0.1 * torch.randn(100)
+    dataset = TensorDataset(x, y, groups)
+    sampler = StratifiedSampler(groups.numpy(), environments_per_batch=3, batch_size=50)
+    # The sampler yields index arrays; batch_size=None indexes the dataset with them.
+    train_loader = DataLoader(dataset, sampler=sampler, batch_size=None)
+    valid_loader = DataLoader(dataset, batch_size=40)
+    model = torch.nn.Sequential(torch.nn.Linear(2, 1), torch.nn.Flatten(0))
 
-    # Selected by validation CVaR among the CVaR-phase epochs.
-    history = pd.read_csv(tmp_path / "run/history.csv")
-    scores = json.loads((tmp_path / "run/scores.json").read_text())
-    assert scores["best_epoch"] == history.epoch[history.cvar_02[5:].idxmin()]
+    history, best_epoch = fit(
+        model, train_loader, valid_loader, AnchorLoss(alpha=0.5, gamma=2), warmup_epochs=2, epochs=3
+    )
 
-    # The checkpoint reproduces the test scores in the original target units.
-    prediction = predict_from_checkpoint(tmp_path / "run/model.pt", data["x_test"])
-    expected = regression_metrics(data["y_test"] - prediction, data["group_test"])
-    assert scores["mse"] == pytest.approx(expected["mse"])
+    # Selected by validation CVaR among the epochs after warmup, and loaded into the model.
+    assert len(history) == 5
+    assert best_epoch == 3 + int(np.argmin([row["cvar_02"] for row in history[2:]]))
+    y, yhat, groups = predict(model, valid_loader)
+    assert regression_metrics(y - yhat, groups)["cvar_02"] == pytest.approx(
+        history[best_epoch - 1]["cvar_02"]
+    )

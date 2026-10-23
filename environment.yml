@@ -9,7 +9,5 @@ dependencies:
   - click >=8
   - setuptools  # build
   - pip  # build
-  - pandas  # scripts and tests
-  - pyarrow  # tests
   - pytest  # tests
   - pytest-cov  # tests
