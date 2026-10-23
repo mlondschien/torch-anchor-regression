@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from deep_cvar_anchor.data import StratifiedSampler, StandardScaler
+from torch_anchor_regression.data import StandardScaler, StratifiedSampler
 
 
 def test_sampler():

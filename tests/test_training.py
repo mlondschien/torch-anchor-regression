@@ -1,12 +1,12 @@
 import json
 
-from click.testing import CliRunner
 import numpy as np
 import pandas as pd
 import pytest
+from click.testing import CliRunner
 
-from deep_cvar_anchor import regression_metrics
 from scripts.train_NYC_taxi import main, predict_from_checkpoint
+from torch_anchor_regression import regression_metrics
 
 
 def test_regression_metrics():
@@ -47,7 +47,7 @@ def test_train_select_and_reload(tmp_path):
     # Selected by validation CVaR among the CVaR-phase epochs.
     history = pd.read_csv(tmp_path / "run/history.csv")
     scores = json.loads((tmp_path / "run/scores.json").read_text())
-    assert scores["best_epoch"] == history.epoch[history.cvar_01[5:].idxmin()]
+    assert scores["best_epoch"] == history.epoch[history.cvar_02[5:].idxmin()]
 
     # The checkpoint reproduces the test scores in the original target units.
     prediction = predict_from_checkpoint(tmp_path / "run/model.pt", data["x_test"])

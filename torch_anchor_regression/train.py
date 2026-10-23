@@ -40,10 +40,10 @@ def fit(
     """
     model.to(device)
     loss.to(device)
-    optimizer = torch.optim.Adam(
+    optimizer = torch.optim.AdamW(
         [
             {"params": model.parameters(), "weight_decay": weight_decay},
-            {"params": loss.parameters()},  # don't weight decay the threshold
+            {"params": loss.parameters(), "weight_decay": 0},  # not the threshold
         ],
         lr=learning_rate,
     )
@@ -69,10 +69,10 @@ def fit(
         scores = regression_metrics(y - yhat, groups)
         history.append(dict(epoch=epoch, train_loss=np.mean(losses), **scores))
         print(", ".join(f"{key}={value:.5g}" for key, value in history[-1].items()), flush=True)
-        # Select the CVaR-phase checkpoint by validation CVaR_0.1 of the group MSEs.
-        if epoch > warmup_epochs and (best is None or scores["cvar_01"] < best["score"]):
+        # Select the CVaR-phase checkpoint by validation CVaR_0.2 of the group MSEs.
+        if epoch > warmup_epochs and (best is None or scores["cvar_02"] < best["score"]):
             best = dict(
-                score=scores["cvar_01"], epoch=epoch, state=copy.deepcopy(model.state_dict())
+                score=scores["cvar_02"], epoch=epoch, state=copy.deepcopy(model.state_dict())
             )
 
     model.load_state_dict(best["state"])

@@ -1,7 +1,6 @@
 """Stratified sampling of discrete environments."""
 
 import math
-import warnings
 
 import numpy as np
 import torch

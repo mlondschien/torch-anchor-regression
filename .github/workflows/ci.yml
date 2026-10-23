@@ -1,0 +1,53 @@
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+name: CI
+
+jobs:
+
+  test:
+    name: Unit tests - ${{ matrix.PYTHON_VERSION }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        PYTHON_VERSION: ["3.12"]
+    defaults:
+      run:
+        # see https://github.com/conda-incubator/setup-miniconda/#important
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up micromamba
+        uses: mamba-org/setup-micromamba@d05808540d968a55ca33c798e0661fb98f533c73
+        with:
+          micromamba-version: 1.5.10-0
+          environment-file: environment.yml
+          create-args: |
+            python=${{ matrix.PYTHON_VERSION }}
+      - name: Install repository
+        run: python -m pip install --no-build-isolation --no-deps --disable-pip-version-check -e .
+      - name: Pytest
+        run: pytest --cov --cov-report xml tests
+      - name: codecov
+        uses: codecov/codecov-action@v4.3.1
+        with:
+          file: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
+          name: pytest-python${{ matrix.PYTHON_VERSION }}
+
+  pre-commit-checks:
+    name: "Pre-commit checks - Python 3.11"
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+      - name: Install Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run pre-commit checks
+        uses: pre-commit/action@v3.0.1

@@ -10,8 +10,8 @@ import torch
 from torch import nn
 from torch.utils.data import BatchSampler, DataLoader, TensorDataset
 
-from deep_cvar_anchor import AnchorLoss, fit, predict, regression_metrics
-from deep_cvar_anchor.data import StandardScaler, StratifiedSampler
+from torch_anchor_regression import AnchorLoss, fit, predict, regression_metrics
+from torch_anchor_regression.data import StandardScaler, StratifiedSampler
 
 
 class MLP(nn.Module):
@@ -81,7 +81,7 @@ def train(
     sampler = StratifiedSampler(
         data["group_train"],
         environments_per_batch=environments_per_batch,
-        min_observations_per_environment=8,
+        min_observations_per_environment=environments_per_batch // 4,
         batch_size=batch_size,
         seed=seed,
     )
@@ -103,7 +103,7 @@ def train(
     test_scores = regression_metrics(residuals, data["group_test"])
     scores = dict(
         test_scores,
-        validation_score=history[best_epoch - 1]["cvar_01"],
+        validation_score=history[best_epoch - 1]["cvar_02"],
         best_epoch=best_epoch,
         batch_size=sampler.batch_size,
         steps_per_epoch=len(sampler),
@@ -149,7 +149,7 @@ def main(data_path, output, **options):
         scores = train(dict(archive), output, **options)
     config = dict(options, data_path=str(data_path.resolve()))
     (output / "config.json").write_text(json.dumps(config, indent=2) + "\n")
-    click.echo(f"Test MSE={scores['mse']:.5f}, CVaR_0.1={scores['cvar_01']:.5f}; {output}")
+    click.echo(f"Test MSE={scores['mse']:.5f}, CVaR_0.2={scores['cvar_02']:.5f}; {output}")
 
 
 if __name__ == "__main__":

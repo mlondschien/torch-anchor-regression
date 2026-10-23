@@ -3,7 +3,7 @@ import itertools
 import pytest
 import torch
 
-from deep_cvar_anchor.loss import AnchorLoss
+from torch_anchor_regression.loss import AnchorLoss
 
 
 @pytest.mark.parametrize("debias", [False, True])

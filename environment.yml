@@ -1,0 +1,15 @@
+name: torch-anchor-regression
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python >=3.10
+  - numpy >=1.24
+  - pytorch >=2.2
+  - click >=8
+  - setuptools  # build
+  - pip  # build
+  - pandas  # scripts and tests
+  - pyarrow  # tests
+  - pytest  # tests
+  - pytest-cov  # tests
